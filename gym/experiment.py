@@ -211,7 +211,7 @@ def experiment(
             act_dim=act_dim,
             max_length=K,
             max_ep_len=max_ep_len,
-            hidden_size=variant['embed_dim'],
+            hidden_size=variant['embed_dim'], # default 128
             n_layer=variant['n_layer'],
             n_head=variant['n_head'],
             n_inner=4*variant['embed_dim'],
