@@ -11,6 +11,15 @@ Then, dependencies can be installed with the following command:
 conda env create -f conda_env.yml
 ```
 
+Update Aug 10:
+
+1. use old version of mujoco at ... , unzip to ..., add activation key at ...
+
+2. need to adjust the versions in the default .yml file to make pipeline work
+
+
+
+
 ## Downloading datasets
 
 Datasets are stored in the `data` directory.

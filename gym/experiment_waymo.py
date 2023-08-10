@@ -1,29 +1,32 @@
-import argparse
-import json
-import os
-import pickle
-import random
-import sys
-
+import gym
 import numpy as np
 import torch
 import wandb
 
-import gym
+import argparse
+import pickle
+import random
+import sys
+import os
 
-sys.path.append("/home/vision/src/xinyi/safe-sb3/examples/metadrive")
-from decision_transformer.evaluation.evaluate_episodes import (
-    evaluate_episode, evaluate_episode_rtg)
-from decision_transformer.models.decision_transformer import \
-    DecisionTransformer
+
+sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive")
+from utils import AddCostToRewardEnv
+from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg
+from decision_transformer.models.decision_transformer import DecisionTransformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
-from metadrive.policy.env_input_policy import EnvInputHeadingAccPolicy
-from metadrive.policy.replay_policy import ReplayEgoCarPolicy
-from utils import AddCostToRewardEnv
 
+from metadrive.policy.replay_policy import ReplayEgoCarPolicy
+from metadrive.policy.env_input_policy import EnvInputHeadingAccPolicy
 WAYMO_SAMPLING_FREQ = 10
+
+
+import pickle
+
+
+    
 
 
 def discount_cumsum(x, gamma):
@@ -54,7 +57,7 @@ def experiment(
         "no_traffic": False,
         "agent_policy":ReplayEgoCarPolicy,
         "waymo_data_directory":variant['pkl_dir'],
-        "case_num": 900,
+        "case_num": 10000,
         "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
         "use_render": False,
         "reactive_traffic": False,
@@ -71,41 +74,34 @@ def experiment(
     }
     )
 
-    max_ep_len = 1000
-    env_targets = [3600, 1800]  # evaluation conditioning targets
-    scale = 1000.  # normalization for rewards/returns
+    max_ep_len = 300
+    env_targets = [400, 600]  # evaluation conditioning targets
+    scale = 100.  # normalization for rewards/returns
 
-    state_dim = env.observation_space.shape[0]
-    act_dim = env.action_space.shape[0]
-
-    variant['max_ep_len'] = max_ep_len
-    variant['scale'] = scale
-    variant['state_dim'] = state_dim
-    variant['act_dim'] = act_dim
-
-    if log_to_wandb:
-        wandb.init(
-            name=exp_prefix,
-            group=group_name,
-            project='decision-transformer',
-            config=variant
-        )
-        # wandb.watch(model)  # wandb has some bug
-        ckpt_path = wandb.run.dir
-    else:
-        ckpt_path = None
     
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
 
+    state_dim = env.observation_space.shape[0]
+    act_dim = env.action_space.shape[0]
+
     # load dataset
     
-    dataset_path = variant['dataset_path']
-    with open(dataset_path, 'rb') as f:
-        trajectories = pickle.load(f)
-
+    pkl_list = os.listdir(variant['dataset_dir'])
     
+    trajectories = []
+    # 
+    for pkl_fn in pkl_list:
+        with open(os.path.join(variant['dataset_dir'], pkl_fn), 'rb') as f:
+            try:
+                temp = pickle.load(f)
+                trajectories.extend(temp)
+            except EOFError:
+                print("........ skipping "+ pkl_fn +" ........")
+    
+    trajectories = sorted(trajectories, key=lambda x: x['seed'])
+    # import pdb; pdb.set_trace()
 
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
@@ -125,14 +121,7 @@ def experiment(
     # used for input normalization
     states = np.concatenate(states, axis=0)
     state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
-    log_stats = {
-        "obs_mean": state_mean.tolist(),
-        "obs_std": state_std.tolist(),
-    }
-    if ckpt_path:
-        stats_path = os.path.join(ckpt_path, 'obs_stats.json')
-        with open(stats_path, 'w') as f:
-            json.dump(log_stats, f, indent=2)
+
     num_timesteps = sum(traj_lens)
 
     print('=' * 50)
@@ -300,7 +289,6 @@ def experiment(
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
-            ckpt_path=ckpt_path,
         )
     elif model_type == 'bc':
         trainer = ActTrainer(
@@ -313,6 +301,15 @@ def experiment(
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
 
+    if log_to_wandb:
+        wandb.init(
+            name=exp_prefix,
+            group=group_name,
+            project='decision-transformer',
+            config=variant
+        )
+        # wandb.watch(model)  # wandb has some bug
+
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         if log_to_wandb:
@@ -322,9 +319,9 @@ def experiment(
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='waymo')
-    parser.add_argument('--dataset_path', type=str, default='/home/vision/src/xinyi/decision-transformer/gym/data/bc_9_900.pkl')  
+    parser.add_argument('--dataset_dir', type=str, default='/home/xinyi/src/data/metadrive/dt_pkl/waymo_n_10000_lam_10_eps_10')  
     parser.add_argument('--mode', type=str, default='9')  # normal for standard setting, delayed for sparse
-    parser.add_argument('--pkl_dir', type=str, default='/home/vision/src/data/metadrive/pkl_9/')
+    parser.add_argument('--pkl_dir', type=str, default='/home/xinyi/src/data/metadrive/pkl_9/')
 
 
     parser.add_argument('--K', type=int, default=20)
