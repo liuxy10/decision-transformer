@@ -49,7 +49,7 @@ def experiment(
 
     env = gym.make(env_name)
     max_ep_len = 400
-    env_targets = [50]  # evaluation conditioning targets
+    env_targets = [50.]  # evaluation conditioning targets
     scale = 10.  # normalization for rewards/returns
 
     state_dim = env.observation_space.shape[0]
@@ -119,6 +119,8 @@ def experiment(
     log_stats = {
         "obs_mean": state_mean.tolist(),
         "obs_std": state_std.tolist(),
+        "reward_scale": scale,
+        "target_return": env_targets[0],
     }
     if ckpt_path:
         stats_path = os.path.join(ckpt_path, 'obs_stats.json')
