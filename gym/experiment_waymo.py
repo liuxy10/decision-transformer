@@ -79,6 +79,7 @@ def experiment(
     act_dim = env.action_space.shape[0]
 
     variant['max_ep_len'] = max_ep_len
+    variant['scale'] = scale
     variant['state_dim'] = state_dim
     variant['act_dim'] = act_dim
 
