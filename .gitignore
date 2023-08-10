@@ -156,3 +156,5 @@ cython_debug/
 wandb/
 
 */data/*.pkl
+
+*/data/*.h5py

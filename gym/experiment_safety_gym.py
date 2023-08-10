@@ -1,17 +1,20 @@
+# Example Usage: 
+# python experiment_safety_gym.py --env Safexp-CarButton-v0 --dataset expert \
+# --model_type dt --data_dir data/sac-Safexp-CarButton1-v0_es3_lam0.1.h5py \
+# --log_to_wandb True --num_eval_steps 10
+
+
 import argparse
 import json
-import os
 import pickle
 import random
 import sys
+import os
+from datetime import datetime
 
 import numpy as np
 import torch
 import wandb
-
-import gym
-
-sys.path.append("/home/vision/src/xinyi/safe-sb3/examples/metadrive")
 from decision_transformer.evaluation.evaluate_episodes import (
     evaluate_episode, evaluate_episode_rtg)
 from decision_transformer.models.decision_transformer import \
@@ -19,12 +22,10 @@ from decision_transformer.models.decision_transformer import \
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
-from metadrive.policy.env_input_policy import EnvInputHeadingAccPolicy
-from metadrive.policy.replay_policy import ReplayEgoCarPolicy
-from utils import AddCostToRewardEnv
 
-WAYMO_SAMPLING_FREQ = 10
-
+import gym
+import safety_gym
+import h5py
 
 def discount_cumsum(x, gamma):
     discount_cumsum = np.zeros_like(x)
@@ -41,39 +42,15 @@ def experiment(
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
 
-    env_name, dataset = variant['env'], 'waymo'#variant['dataset']
+    env_name, dataset = variant['env'], variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
-    
-    # env = gym.make('Hopper-v3')
-    env = AddCostToRewardEnv(
-    {
-        "manual_control": False,
-        "no_traffic": False,
-        "agent_policy":ReplayEgoCarPolicy,
-        "waymo_data_directory":variant['pkl_dir'],
-        "case_num": 900,
-        "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
-        "use_render": False,
-        "reactive_traffic": False,
-                # "vehicle_config": dict(
-                #     show_lidar=True,
-                #     # no_wheel_friction=True,
-                #     lidar=dict(num_lasers=0))
-                "vehicle_config": dict(
-                # no_wheel_friction=True,
-                lidar=dict(num_lasers=120, distance=50, num_others=4),
-                lane_line_detector=dict(num_lasers=12, distance=50),
-                side_detector=dict(num_lasers=160, distance=50)
-            ),
-    }
-    )
-
-    max_ep_len = 1000
-    env_targets = [3600, 1800]  # evaluation conditioning targets
-    scale = 1000.  # normalization for rewards/returns
+    env = gym.make(env_name)
+    max_ep_len = 400
+    env_targets = [50]  # evaluation conditioning targets
+    scale = 10.  # normalization for rewards/returns
 
     state_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
@@ -93,24 +70,38 @@ def experiment(
         ckpt_path = wandb.run.dir
     else:
         ckpt_path = None
-    
+
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
 
     # load dataset
-    
-    dataset_path = variant['dataset_path']
-    with open(dataset_path, 'rb') as f:
-        trajectories = pickle.load(f)
+    data_dir = variant['data_dir']
 
-    
+    with h5py.File(data_dir, 'r') as f:
+        obs = f['observation'][:]
+        ac = f['action'][:]
+        reward = f['reward'][:]
+        terminal = f['terminal'][:]
+        cost = f['cost'][:]
+
+    trajectories = []
+    start = 0
+    for i in range(obs.shape[0]):
+        if terminal[i]:
+            end = i + 1
+            traj = {
+                "observations": obs[start:end],
+                "actions": ac[start:end],
+                "rewards": reward[start:end],
+                "dones": terminal[start:end],
+                "costs": cost[start:end],
+            }
+            trajectories.append(traj)
+            start = end
 
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
-
-    # import pdb; pdb.set_trace()
-    
     states, traj_lens, returns = [], [], []
     for path in trajectories:
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
@@ -132,6 +123,7 @@ def experiment(
         stats_path = os.path.join(ckpt_path, 'obs_stats.json')
         with open(stats_path, 'w') as f:
             json.dump(log_stats, f, indent=2)
+
     num_timesteps = sum(traj_lens)
 
     print('=' * 50)
@@ -253,7 +245,7 @@ def experiment(
 
     if model_type == 'dt':
         model = DecisionTransformer(
-            state_dim=state_dim, # state dimension should be 
+            state_dim=state_dim,
             act_dim=act_dim,
             max_length=K,
             max_ep_len=max_ep_len,
@@ -312,6 +304,7 @@ def experiment(
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
 
+
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         if log_to_wandb:
@@ -320,12 +313,10 @@ def experiment(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='waymo')
-    parser.add_argument('--dataset_path', type=str, default='/home/vision/src/xinyi/decision-transformer/gym/data/bc_9_900.pkl')  
-    parser.add_argument('--mode', type=str, default='9')  # normal for standard setting, delayed for sparse
-    parser.add_argument('--pkl_dir', type=str, default='/home/vision/src/data/metadrive/pkl_9/')
-
-
+    parser.add_argument('--env', type=str, default='Safexp-CarButton1-v0')
+    parser.add_argument('--data_dir', type=str, default='data/sac-Safexp-CarButton1-v0_es3_lam0.1.h5py')
+    parser.add_argument('--dataset', type=str, default='expert')  # medium, medium-replay, medium-expert, expert: inherited from d4rl
+    parser.add_argument('--mode', type=str, default='normal')  # normal for standard setting, delayed for sparse
     parser.add_argument('--K', type=int, default=20)
     parser.add_argument('--pct_traj', type=float, default=1.)
     parser.add_argument('--batch_size', type=int, default=64)
@@ -337,13 +328,13 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.1)
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
-    parser.add_argument('--warmup_steps', type=int, default=10000)
+    parser.add_argument('--warmup_steps', type=int, default=100)
     parser.add_argument('--num_eval_episodes', type=int, default=100)
     parser.add_argument('--max_iters', type=int, default=10)
     parser.add_argument('--num_steps_per_iter', type=int, default=10000)
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
+    parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()
 
-    experiment('metadrive-gym', variant=vars(args))
+    experiment('gym-experiment', variant=vars(args))
