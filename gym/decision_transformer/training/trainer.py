@@ -1,12 +1,13 @@
 import numpy as np
 import torch
+import os
 
 import time
 import tqdm
 
 class Trainer:
 
-    def __init__(self, model, optimizer, batch_size, get_batch, loss_fn, scheduler=None, eval_fns=None):
+    def __init__(self, model, optimizer, batch_size, get_batch, loss_fn, scheduler=None, eval_fns=None, ckpt_path=None):
         self.model = model
         self.optimizer = optimizer
         self.batch_size = batch_size
@@ -15,8 +16,14 @@ class Trainer:
         self.scheduler = scheduler
         self.eval_fns = [] if eval_fns is None else eval_fns
         self.diagnostics = dict()
+        self.ckpt_path = (
+            os.path.join(ckpt_path, 'model.pt') if ckpt_path else None
+        )
 
         self.start_time = time.time()
+
+    def save_checkpoint(self):
+        torch.save(self.model.state_dict(), self.ckpt_path)
 
     def train_iteration(self, num_steps, iter_num=0, print_logs=False):
 
@@ -33,7 +40,8 @@ class Trainer:
                 self.scheduler.step()
 
         logs['time/training'] = time.time() - train_start
-
+        if self.ckpt_path:
+            self.save_checkpoint()
         eval_start = time.time()
 
         self.model.eval()

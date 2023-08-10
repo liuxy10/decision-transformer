@@ -1,18 +1,23 @@
-import gym
-import numpy as np
-import torch
-import wandb
-
 import argparse
+import json
 import pickle
 import random
 import sys
+import os
+from datetime import datetime
 
-from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg
-from decision_transformer.models.decision_transformer import DecisionTransformer
+import numpy as np
+import torch
+import wandb
+from decision_transformer.evaluation.evaluate_episodes import (
+    evaluate_episode, evaluate_episode_rtg)
+from decision_transformer.models.decision_transformer import \
+    DecisionTransformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
+
+import gym
 
 
 def discount_cumsum(x, gamma):
@@ -34,6 +39,18 @@ def experiment(
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
+
+    if log_to_wandb:
+        wandb.init(
+            name=exp_prefix,
+            group=group_name,
+            project='decision-transformer',
+            config=variant
+        )
+        # wandb.watch(model)  # wandb has some bug
+        ckpt_path = wandb.run.dir
+    else:
+        ckpt_path = None
 
     if env_name == 'hopper':
         env = gym.make('Hopper-v3')
@@ -85,6 +102,14 @@ def experiment(
     # used for input normalization
     states = np.concatenate(states, axis=0)
     state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+    log_stats = {
+        "obs_mean": state_mean.tolist(),
+        "obs_std": state_std.tolist(),
+    }
+    if ckpt_path:
+        stats_path = os.path.join(ckpt_path, 'obs_stats.json')
+        with open(stats_path, 'w') as f:
+            json.dump(log_stats, f, indent=2)
 
     num_timesteps = sum(traj_lens)
 
@@ -253,6 +278,7 @@ def experiment(
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
+            ckpt_path=ckpt_path,
         )
     elif model_type == 'bc':
         trainer = ActTrainer(
@@ -265,14 +291,6 @@ def experiment(
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
 
-    if log_to_wandb:
-        wandb.init(
-            name=exp_prefix,
-            group=group_name,
-            project='decision-transformer',
-            config=variant
-        )
-        # wandb.watch(model)  # wandb has some bug
 
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
