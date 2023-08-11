@@ -130,7 +130,6 @@ def evaluate_episode_rtg(
         timesteps = torch.cat(
             [timesteps,
              torch.ones((1, 1), device=device, dtype=torch.long) * (t+1)], dim=1)
-
         episode_return += reward
         episode_length += 1
 
