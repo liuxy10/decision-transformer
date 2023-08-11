@@ -145,8 +145,6 @@ def experiment(
     log_stats = {
         "obs_mean": state_mean.tolist(),
         "obs_std": state_std.tolist(),
-        "reward_scale": scale,
-        "target_return": env_targets[0],
     }
     if ckpt_path:
         stats_path = os.path.join(ckpt_path, 'obs_stats.json')
