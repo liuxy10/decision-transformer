@@ -23,6 +23,7 @@ class Trainer:
         self.start_time = time.time()
 
     def save_checkpoint(self):
+        print("[save_checkpoint] model saved at "+self.ckpt_path)
         torch.save(self.model.state_dict(), self.ckpt_path)
 
     def train_iteration(self, num_steps, iter_num=0, print_logs=False):
@@ -42,6 +43,7 @@ class Trainer:
         logs['time/training'] = time.time() - train_start
         if self.ckpt_path:
             self.save_checkpoint()
+
         eval_start = time.time()
 
         self.model.eval()

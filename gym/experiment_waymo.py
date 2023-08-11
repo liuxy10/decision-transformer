@@ -4,6 +4,7 @@ import torch
 import wandb
 
 import argparse
+import json
 import pickle
 import random
 import sys
@@ -49,7 +50,19 @@ def experiment(
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
-    
+    if log_to_wandb:
+        wandb.init(
+            name=exp_prefix,
+            group=group_name,
+            project='decision-transformer',
+            config=variant
+        )
+        # wandb.watch(model)  # wandb has some bug
+        ckpt_path = wandb.run.dir
+        print("[DT] logging data to "+ ckpt_path)
+    else:
+        ckpt_path = None
+
     # env = gym.make('Hopper-v3')
     env = AddCostToRewardEnv(
     {
@@ -101,13 +114,18 @@ def experiment(
                 print("........ skipping "+ pkl_fn +" ........")
     
     trajectories = sorted(trajectories, key=lambda x: x['seed'])
+
+    # report info about the waymo data collected:
+    # print('=' * 50)
+    # print(f'reward/cost info about the waymo data: ')
+    # print(f'lambda = 10')
+    # print(f'avg. reward per expert trajectory {np.mean([path['rewards'] for path in trajectories])}')
+    # print(f'avg. cost per expert trajectory {np.mean([path['cost'] for path in trajectories])}')
+    # print('=' * 50)
     # import pdb; pdb.set_trace()
 
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
-
-    # import pdb; pdb.set_trace()
-    
     states, traj_lens, returns = [], [], []
     for path in trajectories:
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
@@ -116,11 +134,22 @@ def experiment(
         states.append(path['observations'])
         traj_lens.append(len(path['observations']))
         returns.append(path['rewards'].sum())
+        if path['rewards'].sum() < -500:
+            print("path['rewards'].sum() < -500: "+ str(path['seed']))
+            # import pdb; pdb.set_trace()
     traj_lens, returns = np.array(traj_lens), np.array(returns)
 
     # used for input normalization
     states = np.concatenate(states, axis=0)
     state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+    log_stats = {
+        "obs_mean": state_mean.tolist(),
+        "obs_std": state_std.tolist(),
+    }
+    if ckpt_path:
+        stats_path = os.path.join(ckpt_path, 'obs_stats.json')
+        with open(stats_path, 'w') as f:
+            json.dump(log_stats, f, indent=2)
 
     num_timesteps = sum(traj_lens)
 
@@ -289,6 +318,7 @@ def experiment(
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
+            ckpt_path=ckpt_path,
         )
     elif model_type == 'bc':
         trainer = ActTrainer(
