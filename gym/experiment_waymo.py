@@ -79,16 +79,16 @@ def experiment(
                 #     # no_wheel_friction=True,
                 #     lidar=dict(num_lasers=0))
                 "vehicle_config": dict(
-                # no_wheel_friction=True,
-                lidar=dict(num_lasers=120, distance=50, num_others=4),
-                lane_line_detector=dict(num_lasers=12, distance=50),
-                side_detector=dict(num_lasers=160, distance=50)
-            ),
+               # no_wheel_friction=True,
+               lidar=dict(num_lasers=80, distance=50, num_others=4), # 120
+               lane_line_detector=dict(num_lasers=12, distance=50), # 12
+               side_detector=dict(num_lasers=20, distance=50) # 160
+               ),
     }
     )
 
     max_ep_len = 300
-    env_targets = [400, 600]  # evaluation conditioning targets
+    env_targets = [400,600] # evaluation conditioning targets
     scale = 100.  # normalization for rewards/returns
 
     
@@ -110,7 +110,7 @@ def experiment(
             try:
                 temp = pickle.load(f)
                 trajectories.extend(temp)
-            except EOFError:
+            except:
                 print("........ skipping "+ pkl_fn +" ........")
     
     trajectories = sorted(trajectories, key=lambda x: x['seed'])
@@ -127,16 +127,24 @@ def experiment(
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
     states, traj_lens, returns = [], [], []
+    ill_seed = []
     for path in trajectories:
+        # print("path['rewards'].shape", path['rewards'].shape)
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
             path['rewards'][-1] = path['rewards'].sum()
             path['rewards'][:-1] = 0.
-        states.append(path['observations'])
-        traj_lens.append(len(path['observations']))
-        returns.append(path['rewards'].sum())
-        if path['rewards'].sum() < -500:
-            print("path['rewards'].sum() < -500: "+ str(path['seed']))
-            # import pdb; pdb.set_trace()
+        if path['rewards'].sum() > 0:
+
+            states.append(path['observations'])
+            traj_lens.append(len(path['observations']))
+            returns.append(path['rewards'].sum())
+        else:
+            # print("path['rewards'].sum() < -250: "+ str(path['seed']))
+            ill_seed.append([path['seed'],path['rewards'].sum()] )
+            
+    trajectories = [d for d in trajectories if d.get("seed") not in np.array(ill_seed)[:,0]]
+    print("path['rewards'].sum() < 0: ", np.array(ill_seed) )
+    np.save(os.path.join(variant['dataset_dir'], "ill_seed.npy"), np.array(ill_seed), allow_pickle=True)
     traj_lens, returns = np.array(traj_lens), np.array(returns)
 
     # used for input normalization
@@ -230,11 +238,11 @@ def experiment(
 
     def eval_episodes(target_rew):
         def fn(model):
-            returns, lengths = [], []
+            successes, returns, lengths = [], [], []
             for _ in range(num_eval_episodes):
                 with torch.no_grad():
                     if model_type == 'dt':
-                        ret, length = evaluate_episode_rtg(
+                        ret, length, is_success = evaluate_episode_rtg(
                             env,
                             state_dim,
                             act_dim,
@@ -248,7 +256,7 @@ def experiment(
                             device=device,
                         )
                     else:
-                        ret, length = evaluate_episode(
+                        ret, length, is_success = evaluate_episode(
                             env,
                             state_dim,
                             act_dim,
@@ -262,7 +270,9 @@ def experiment(
                         )
                 returns.append(ret)
                 lengths.append(length)
+                successes.append(is_success)
             return {
+                f'target_{target_rew}_success_rate': np.mean(successes),
                 f'target_{target_rew}_return_mean': np.mean(returns),
                 f'target_{target_rew}_return_std': np.std(returns),
                 f'target_{target_rew}_length_mean': np.mean(lengths),
@@ -339,7 +349,9 @@ def experiment(
             config=variant
         )
         # wandb.watch(model)  # wandb has some bug
+    
 
+    print("variant['max_iters'] = ", variant['max_iters'], "variant['num_eval_episodes'] =", variant['num_eval_episodes'])
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         if log_to_wandb:
@@ -349,26 +361,26 @@ def experiment(
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='waymo')
-    parser.add_argument('--dataset_dir', type=str, default='/home/xinyi/src/data/metadrive/dt_pkl/waymo_n_10000_lam_10_eps_10')  
+    parser.add_argument('--dataset_dir', type=str, default='/home/xinyi/src/data/metadrive/dt_pkl/waymo_n_10000_lam_1_eps_10')  
     parser.add_argument('--mode', type=str, default='9')  # normal for standard setting, delayed for sparse
     parser.add_argument('--pkl_dir', type=str, default='/home/xinyi/src/data/metadrive/pkl_9/')
 
 
     parser.add_argument('--K', type=int, default=20)
-    parser.add_argument('--pct_traj', type=float, default=1.)
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--pct_traj', type=float, default=1.) 
+    parser.add_argument('--batch_size', type=int, default=512) # increase to stablize, as well as dataset 
     parser.add_argument('--model_type', type=str, default='dt')  # dt for decision transformer, bc for behavior cloning
-    parser.add_argument('--embed_dim', type=int, default=128)
+    parser.add_argument('--embed_dim', type=int, default=128) 
     parser.add_argument('--n_layer', type=int, default=3)
     parser.add_argument('--n_head', type=int, default=1)
     parser.add_argument('--activation_function', type=str, default='relu')
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4)
+    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4) 
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=10000)
-    parser.add_argument('--num_eval_episodes', type=int, default=10)
+    parser.add_argument('--num_eval_episodes', type=int, default=50)
     parser.add_argument('--max_iters', type=int, default=1000)
-    parser.add_argument('--num_steps_per_iter', type=int, default=10000)
+    parser.add_argument('--num_steps_per_iter', type=int, default=5000)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
     

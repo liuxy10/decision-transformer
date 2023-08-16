@@ -59,7 +59,7 @@ def evaluate_episode(
         if done:
             break
 
-    return episode_return, episode_length
+    return episode_return, episode_length, info['arrive_dest']
 
 
 def evaluate_episode_rtg(
@@ -115,7 +115,7 @@ def evaluate_episode_rtg(
         actions[-1] = action
         action = action.detach().cpu().numpy()
 
-        state, reward, done, _ = env.step(action)
+        state, reward, done, info = env.step(action)
 
         cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
@@ -136,4 +136,4 @@ def evaluate_episode_rtg(
         if done:
             break
 
-    return episode_return, episode_length
+    return episode_return, episode_length, info['arrive_dest']
