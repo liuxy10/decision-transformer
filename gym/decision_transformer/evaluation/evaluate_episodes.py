@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import sys
 sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/training")
+sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/data_processing")
 sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/testing")
 import matplotlib.pyplot as plt
 import os
@@ -53,7 +54,7 @@ def evaluate_episode(
         actions[-1] = action
         action = action.detach().cpu().numpy()
 
-        state, reward, done, _ = env.step(action)
+        state, reward, done, info = env.step(action)
 
         cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
@@ -247,6 +248,8 @@ def evaluate_episode_rtg_waymo(
         episode_length += 1
 
         if done:
+            actual_heading[t:] = None
+            actual_speed[t:] = None
             break
 
     plot_comparison = True
@@ -255,7 +258,7 @@ def evaluate_episode_rtg_waymo(
         pos_pred = np.array(pos_pred)
         fig, axs = plt.subplots(2, 2)
         md_name = 'DT'
-        axs[0,0].plot(ts, action_pred[:,1], label = md_name +' DT pred acc')
+        axs[0,0].plot(ts, action_pred[:,1], label = md_name +' pred acc')
         axs[0,0].plot(ts, acc_rec, label = 'waymo acc' )
         axs[1,0].plot(ts, actual_heading, label = md_name +' actual heading' )
         axs[1,0].plot(ts, heading_rec, label = 'waymo heading')

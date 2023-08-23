@@ -157,7 +157,7 @@ def experiment(
             ill_seed.append([path['seed'],path['rewards'].sum()] )
             
     trajectories = [d for d in trajectories if d.get("seed") not in np.array(ill_seed)[:,0]]
-    print("path['rewards'].sum() < 0: ", np.array(ill_seed) )
+    # print("path['rewards'].sum() < 0: ", np.array(ill_seed) )
     np.save(os.path.join(variant['dataset_dir'], "ill_seed.npy"), np.array(ill_seed), allow_pickle=True)
     traj_lens, returns = np.array(traj_lens), np.array(returns)
 
@@ -270,7 +270,7 @@ def experiment(
                             state_mean=state_mean,
                             state_std=state_std,
                             device=device,
-                            save_fig_dir= "/home/xinyi/src/safe-sb3/examples/metadrive/figs/DT"
+                            save_fig_dir= "/home/xinyi/src/safe-sb3/examples/metadrive/figs/guide_only_dt_training"
                         )
                     else:
                         ret, length, is_success = evaluate_episode(
@@ -399,10 +399,10 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4) 
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=10000)
-    parser.add_argument('--num_eval_episodes', type=int, default=50)
+    # parser.add_argument('--num_eval_episodes', type=int, default=50)
+    parser.add_argument('--num_eval_episodes', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=200)
     # parser.add_argument('--num_steps_per_iter', type=int, default=5000)
-    parser.add_argument('--num_steps_per_iter', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda')
     # parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
