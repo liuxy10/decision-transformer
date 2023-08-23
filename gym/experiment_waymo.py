@@ -11,9 +11,11 @@ import sys
 import os
 
 
-sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive")
+sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/training")
+sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/testing")
 from utils import AddCostToRewardEnv
-from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg
+from visualize import plot_waymo_vs_pred
+from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg_waymo
 from decision_transformer.models.decision_transformer import DecisionTransformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
@@ -50,6 +52,46 @@ def experiment(
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
+
+    # env = gym.make('Hopper-v3')
+    env = AddCostToRewardEnv(
+    {
+        "manual_control": False,
+        "no_traffic": False,
+        "agent_policy":ReplayEgoCarPolicy,
+        "waymo_data_directory":variant['pkl_dir'],
+        "case_num": 100,
+        "start_seed": 0,
+        "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
+        "use_render": False,
+        "reactive_traffic": False,
+                "vehicle_config": dict(
+               # no_wheel_friction=True,
+               lidar=dict(num_lasers=80, distance=50, num_others=4), # 120
+               lane_line_detector=dict(num_lasers=12, distance=50), # 12
+               side_detector=dict(num_lasers=20, distance=50) # 160
+               ),
+    }
+    )
+    print("building test set")
+    test_env = AddCostToRewardEnv(env.config)
+    test_env.config.update({
+        "case_num": 1000,
+        "start_seed":10000,
+    })
+
+    max_ep_len = 90
+    env_targets = [400,600] # evaluation conditioning targets
+    scale = 100.  # normalization for rewards/returns
+
+    state_dim = env.observation_space.shape[0]
+    act_dim = env.action_space.shape[0]
+
+    variant['max_ep_len'] = max_ep_len
+    variant['scale'] = scale
+    variant['state_dim'] = state_dim
+    variant['act_dim'] = act_dim
+
     if log_to_wandb:
         wandb.init(
             name=exp_prefix,
@@ -63,35 +105,7 @@ def experiment(
     else:
         ckpt_path = None
 
-    # env = gym.make('Hopper-v3')
-    env = AddCostToRewardEnv(
-    {
-        "manual_control": False,
-        "no_traffic": False,
-        "agent_policy":ReplayEgoCarPolicy,
-        "waymo_data_directory":variant['pkl_dir'],
-        "case_num": 10000,
-        "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
-        "use_render": False,
-        "reactive_traffic": False,
-                # "vehicle_config": dict(
-                #     show_lidar=True,
-                #     # no_wheel_friction=True,
-                #     lidar=dict(num_lasers=0))
-                "vehicle_config": dict(
-               # no_wheel_friction=True,
-               lidar=dict(num_lasers=80, distance=50, num_others=4), # 120
-               lane_line_detector=dict(num_lasers=12, distance=50), # 12
-               side_detector=dict(num_lasers=20, distance=50) # 160
-               ),
-    }
-    )
 
-    max_ep_len = 300
-    env_targets = [400,600] # evaluation conditioning targets
-    scale = 100.  # normalization for rewards/returns
-
-    
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
@@ -153,6 +167,8 @@ def experiment(
     log_stats = {
         "obs_mean": state_mean.tolist(),
         "obs_std": state_std.tolist(),
+        "reward_scale": scale,
+        "target_return": env_targets[0],
     }
     if ckpt_path:
         stats_path = os.path.join(ckpt_path, 'obs_stats.json')
@@ -242,8 +258,8 @@ def experiment(
             for _ in range(num_eval_episodes):
                 with torch.no_grad():
                     if model_type == 'dt':
-                        ret, length, is_success = evaluate_episode_rtg(
-                            env,
+                        ret, length, is_success = evaluate_episode_rtg_waymo(
+                            test_env,
                             state_dim,
                             act_dim,
                             model,
@@ -254,10 +270,11 @@ def experiment(
                             state_mean=state_mean,
                             state_std=state_std,
                             device=device,
+                            save_fig_dir= "/home/xinyi/src/safe-sb3/examples/metadrive/figs/DT"
                         )
                     else:
                         ret, length, is_success = evaluate_episode(
-                            env,
+                            test_env,
                             state_dim,
                             act_dim,
                             model,
@@ -358,6 +375,10 @@ def experiment(
             wandb.log(outputs)
 
 
+
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='waymo')
@@ -379,11 +400,16 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=10000)
     parser.add_argument('--num_eval_episodes', type=int, default=50)
-    parser.add_argument('--max_iters', type=int, default=1000)
-    parser.add_argument('--num_steps_per_iter', type=int, default=5000)
+    parser.add_argument('--max_iters', type=int, default=200)
+    # parser.add_argument('--num_steps_per_iter', type=int, default=5000)
+    parser.add_argument('--num_steps_per_iter', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
+    # parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
+    parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()
 
     experiment('metadrive-gym', variant=vars(args))
+
+    
+    
