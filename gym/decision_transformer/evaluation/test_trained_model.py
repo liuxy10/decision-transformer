@@ -108,7 +108,7 @@ if __name__== "__main__":
 
     print(
         eval(model, 'dt',
-       num_eval_episodes=10, test_env=test_env,  state_dim=145, act_dim=2, 
+       num_eval_episodes=100, test_env=test_env,  state_dim=145, act_dim=2, 
        max_ep_len=90, scale=100, target_rew=400, mode='normal', state_mean=obs_mean, state_std=obs_std, device='cpu')
     )
     
