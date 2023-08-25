@@ -28,7 +28,7 @@ import pickle
 
 def eval(model, model_type,
        num_eval_episodes, test_env,  state_dim, act_dim, 
-       max_ep_len, scale, target_rew, mode, state_mean, state_std, device):
+       max_ep_len, rew_scale, acc_scale, target_rew, mode, state_mean, state_std, device):
     successes, returns, lengths, success_seeds = [], [], [], []
     for _ in range(num_eval_episodes):
         with torch.no_grad():
@@ -39,8 +39,9 @@ def eval(model, model_type,
                     act_dim,
                     model,
                     max_ep_len=max_ep_len,
-                    scale=scale,
-                    target_return=target_rew/scale,
+                    rew_scale=rew_scale,
+                    acc_scale = acc_scale,
+                    target_return=target_rew/rew_scale,
                     mode=mode,
                     state_mean=state_mean,
                     state_std=state_std,
@@ -56,7 +57,7 @@ def eval(model, model_type,
                     act_dim,
                     model,
                     max_ep_len=max_ep_len,
-                    target_return=target_rew/scale,
+                    target_return=target_rew/rew_scale,
                     mode=mode,
                     state_mean=state_mean,
                     state_std=state_std,
@@ -112,7 +113,7 @@ if __name__== "__main__":
     print(
         eval(model, 'dt',
        num_eval_episodes=100, test_env=test_env,  state_dim=145, act_dim=2, 
-       max_ep_len=90, scale=100, target_rew=400, mode='normal', state_mean=obs_mean, state_std=obs_std, device='cpu')
+       max_ep_len=90, rew_scale=100, acc_scale=5., target_rew=400, mode='normal', state_mean=obs_mean, state_std=obs_std, device='cpu')
     )
     
 

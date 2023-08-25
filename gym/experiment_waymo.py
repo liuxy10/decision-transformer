@@ -15,7 +15,7 @@ sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/training")
 sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/testing")
 from utils import AddCostToRewardEnv
 from visualize import plot_waymo_vs_pred
-from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg
+from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg, evaluate_episode_rtg_waymo
 from decision_transformer.models.decision_transformer import DecisionTransformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
@@ -262,7 +262,8 @@ def experiment(
             for _ in range(num_eval_episodes):
                 with torch.no_grad():
                     if model_type == 'dt':
-                        ret, length, is_success = evaluate_episode_rtg(
+                        # ret, length, is_success = evaluate_episode_rtg(
+                        ret, length, is_success =  evaluate_episode_rtg_waymo(
                             test_env,
                             state_dim,
                             act_dim,
@@ -274,7 +275,8 @@ def experiment(
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,
-                            device=device
+                            device=device,
+                            save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/training"
                             )
                     else:
                         ret, length, is_success = evaluate_episode(
@@ -408,7 +410,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_iters', type=int, default=200)
     parser.add_argument('--num_steps_per_iter', type=int, default=5000)
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
+    parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
     # parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()

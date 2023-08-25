@@ -275,7 +275,7 @@ def evaluate_episode_rtg_waymo(
                    save_fig_dir,
                    seed)
 
-    return episode_return, episode_length, info['arrive_dest'], env.engine.global_random_seed
+    return episode_return, episode_length, info['arrive_dest']
 
 def plot_states_compare(ts, 
                    action_pred, acc_rec, 
@@ -287,8 +287,9 @@ def plot_states_compare(ts,
     actual_pos = np.array(actual_pos)
     fig, axs = plt.subplots(2, 2, figsize = (12,12), gridspec_kw={'width_ratios': [1, 1], 'height_ratios': [1, 1]})
     md_name = 'DT'
-    axs[0,0].plot(ts, action_pred[:,1], label = md_name +' pred acc')
+    
     axs[0,0].plot(ts, acc_rec, label = 'waymo acc' )
+    axs[0,0].plot(ts, action_pred[:,1], label = md_name +' pred acc')
     # axs[1,0].plot(ts, actual_heading, label = md_name +' actual heading' )
     # axs[1,0].plot(ts, heading_rec, label = 'waymo heading')
     axs[1,0].set_aspect('equal')
