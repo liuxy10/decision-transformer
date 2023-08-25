@@ -158,3 +158,5 @@ wandb/
 */data/*.pkl
 
 */data/*.h5py
+
+*.jpg

@@ -77,7 +77,8 @@ def evaluate_episode_rtg(
         act_dim,
         model,
         max_ep_len=1000,
-        scale=1000.,
+        rew_scale=1000.,
+        acc_scale = 5.,
         state_mean=0.,
         state_std=1.,
         device='cuda',
@@ -123,6 +124,7 @@ def evaluate_episode_rtg(
         )
         actions[-1] = action
         action = action.detach().cpu().numpy()
+        action [1] *= acc_scale
 
         state, reward, done, info = env.step(action)
 
@@ -131,7 +133,7 @@ def evaluate_episode_rtg(
         rewards[-1] = reward
 
         if mode != 'delayed':
-            pred_return = target_return[0,-1] - (reward/scale)
+            pred_return = target_return[0,-1] - (reward/rew_scale)
         else:
             pred_return = target_return[0,-1]
         target_return = torch.cat(
@@ -153,7 +155,8 @@ def evaluate_episode_rtg_waymo(
         act_dim,
         model,
         max_ep_len=1000,
-        scale=1000.,
+        rew_scale=1000.,
+        acc_scale = 5.,
         state_mean=0.,
         state_std=1.,
         device='cuda',
@@ -216,9 +219,9 @@ def evaluate_episode_rtg_waymo(
             timesteps.to(dtype=torch.long),
         )
         actions[-1] = action
-        if abs(action[1]) >1:
-            print("[evaluate_episode] ~~~~~~~~~~~~~~~~~~~ means that DT generate actions larger than 1~~~~~~~~~~~~~~")
         action = action.detach().cpu().numpy()
+        action [1] *= acc_scale
+
 
         state, reward, done, info = env.step(action)
 
@@ -240,7 +243,7 @@ def evaluate_episode_rtg_waymo(
 
 
         if mode != 'delayed':
-            pred_return = target_return[0,-1] - (reward/scale)
+            pred_return = target_return[0,-1] - (reward/rew_scale)
         else:
             pred_return = target_return[0,-1]
         target_return = torch.cat(

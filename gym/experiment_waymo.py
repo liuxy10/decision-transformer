@@ -24,7 +24,7 @@ from decision_transformer.training.seq_trainer import SequenceTrainer
 from metadrive.policy.replay_policy import ReplayEgoCarPolicy
 from metadrive.policy.env_input_policy import EnvInputHeadingAccPolicy
 WAYMO_SAMPLING_FREQ = 10
-
+acc_scale = 5
 
 import pickle
 
@@ -47,7 +47,7 @@ def experiment(
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
 
-    env_name, dataset = variant['env'], 'waymo'#variant['dataset']
+    env_name, dataset = variant['env'], 'waymo_AC_5'#variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
@@ -219,7 +219,11 @@ def experiment(
 
             # get sequences from dataset
             s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
-            a.append(traj['actions'][si:si + max_len].reshape(1, -1, act_dim))
+
+            # xinyi: normalize acc from -5,5 to -1,1
+            ac = traj['actions'][si:si + max_len].reshape(1, -1, act_dim)
+            ac[0, :, 1] /= acc_scale 
+            a.append(ac)
             r.append(traj['rewards'][si:si + max_len].reshape(1, -1, 1))
             if 'terminals' in traj:
                 d.append(traj['terminals'][si:si + max_len].reshape(1, -1))
@@ -264,7 +268,8 @@ def experiment(
                             act_dim,
                             model,
                             max_ep_len=max_ep_len,
-                            scale=scale,
+                            rew_scale=scale,
+                            acc_scale= 5,
                             target_return=target_rew/scale,
                             mode=mode,
                             state_mean=state_mean,
