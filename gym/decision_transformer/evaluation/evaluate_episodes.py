@@ -216,6 +216,8 @@ def evaluate_episode_rtg_waymo(
             timesteps.to(dtype=torch.long),
         )
         actions[-1] = action
+        if abs(action[1]) >1:
+            print("[evaluate_episode] ~~~~~~~~~~~~~~~~~~~ means that DT generate actions larger than 1~~~~~~~~~~~~~~")
         action = action.detach().cpu().numpy()
 
         state, reward, done, info = env.step(action)
@@ -250,11 +252,11 @@ def evaluate_episode_rtg_waymo(
         episode_length += 1
 
         if done:
-            actual_heading[t:] = None
-            actual_speed[t:] = None
-            action_pred[t:] = None
-            actual_rew[t:] = None
-            actual_pos[t:,:] = None
+            actual_heading[t+1:] = None
+            actual_speed[t+1:] = None
+            action_pred[t+1:] = None
+            actual_rew[t+1:] = None
+            actual_pos[t+1:,:] = None
 
             break
 
@@ -270,7 +272,7 @@ def evaluate_episode_rtg_waymo(
                    save_fig_dir,
                    seed)
 
-    return episode_return, episode_length, info['arrive_dest']
+    return episode_return, episode_length, info['arrive_dest'], env.engine.global_random_seed
 
 def plot_states_compare(ts, 
                    action_pred, acc_rec, 
@@ -289,6 +291,7 @@ def plot_states_compare(ts,
     axs[1,0].set_aspect('equal')
     plot_car(axs[1,0], actual_pos[:,0], actual_pos[:,1], actual_heading, label = md_name)
     plot_car(axs[1,0], pos_rec[:,0], pos_rec[:,1], heading_rec, label = "waymo")
+    plot_dest_range(axs[1,0], pos_rec[-1,:], 5)
     axs[0,1].plot(ts, actual_speed, label = md_name+' actual speed' )
     axs[0,1].plot(ts, speed_rec, label = 'waymo speed')
     axs[1,1].plot(ts, actual_rew, label = md_name+' actual reward' )
@@ -302,7 +305,7 @@ def plot_states_compare(ts,
                 axs[i,j].set_xlim([0,9])
             else:
                 x_mid, y_mid = pos_rec[45,0],pos_rec[45,1]
-                w = max(max(1, max(np.ptp(pos_rec[:,0]),np.ptp(pos_rec[:,1]))/2),
+                w = max(max(6, max(np.ptp(pos_rec[:,0]),np.ptp(pos_rec[:,1]))),
                         np.max(abs(actual_pos[:,0] - x_mid)))
                 axs[i,j].set_xlim([x_mid - w, x_mid + w])
                 axs[i,j].set_ylim([y_mid - w, y_mid + w])
@@ -321,6 +324,9 @@ def plot_states_compare(ts,
     else:
         plt.show()
 
+def plot_dest_range(ax, center, radius):
+    circle = plt.Circle(center, radius, fill=False, edgecolor='red')
+    ax.add_patch(circle)
 
 def plot_car(ax, xs, ys, headings, label):
     
