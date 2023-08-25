@@ -21,7 +21,7 @@ from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
 
-from metadrive.policy.replay_policy import ReplayEgoCarPolicy
+from metadrive.policy.replay_policy import ReplayEgoCarPolicy, PMKinematicsEgoPolicy
 from metadrive.policy.env_input_policy import EnvInputHeadingAccPolicy
 WAYMO_SAMPLING_FREQ = 10
 acc_scale = 5
@@ -58,7 +58,7 @@ def experiment(
     {
         "manual_control": False,
         "no_traffic": False,
-        "agent_policy":ReplayEgoCarPolicy,
+        "agent_policy": PMKinematicsEgoPolicy,
         "waymo_data_directory":variant['pkl_dir'],
         "case_num": 100,
         "start_seed": 0,
@@ -404,13 +404,13 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.1)
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4) 
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
-    parser.add_argument('--warmup_steps', type=int, default=10000)
+    parser.add_argument('--warmup_steps', type=int, default=1000) #10000
     parser.add_argument('--num_eval_episodes', type=int, default=50)
     # parser.add_argument('--num_eval_episodes', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=200)
-    parser.add_argument('--num_steps_per_iter', type=int, default=5000)
+    parser.add_argument('--num_steps_per_iter', type=int, default=500) # 5000
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
+    parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     # parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()
