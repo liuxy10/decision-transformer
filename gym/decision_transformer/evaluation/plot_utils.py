@@ -81,12 +81,16 @@ def plot_car(ax, xs, ys, headings, label):
     
     if label == 'DT':
         car_icon_path = '/home/xinyi/src/decision-transformer/gym/car_red.png'
-        car_icon = plt.imread(car_icon_path)
         ax.plot(xs, ys, label = label, color = "red")
-    else:
+    elif label == 'waymo':
         car_icon_path = '/home/xinyi/src/decision-transformer/gym/car_blue.png'
-        car_icon = plt.imread(car_icon_path)
+        # car_icon = plt.imread(car_icon_path)
         ax.plot(xs, ys, label = label, color = "blue")
+    elif label == 'traffic':
+        car_icon_path = '/home/xinyi/src/decision-transformer/gym/car_purple.png'
+        # car_icon = plt.imread(car_icon_path)
+        ax.plot(xs, ys, label = label, color = "purple")
+
     for i in range(xs.shape[0]):
         if i % 10 == 0 and ~np.isnan(xs[i]):
             # Plot car icon
@@ -94,7 +98,9 @@ def plot_car(ax, xs, ys, headings, label):
             
             # Rotate the car icon based on heading
             rotated_car_icon = rotate_image(car_icon_path, -90 + headings[i] * 180 /np.pi)
-            imagebox = OffsetImage(rotated_car_icon, zoom=0.05, alpha =transparency )
+            imagebox = OffsetImage(rotated_car_icon, 
+                                    zoom= 0.05, #0.05, 
+                                    alpha =transparency )
             ab = AnnotationBbox(imagebox, (xs[i], ys[i]), frameon=False)
             ax.add_artist(ab)
     
@@ -135,7 +141,28 @@ def rotate_image(path, angle):
     return np.array(rotated_canvas)
 
 
+
+if __name__ == "__main__":
+
+    import pickle
+    import sys
+    sys.path.append("/home/xinyi/src/safe-sb3/examples/metadrive/data_processing")
+    from waymo_utils import *
     
+    pickle_file_path = "/home/xinyi/src/data/metadrive/pkl_9/0.pkl"
+
+    with open(pickle_file_path, 'rb') as file:
+        data = pickle.load(file)
+    # read_waymo_data(pickle_file_path)
+    fig_bv, ax = plt.subplots(1,1, figsize = (12,12)) #, gridspec_kw={'width_ratios': [1, 1], 'height_ratios': [1, 1]} )
+    draw_waymo_map(data)
     
 
+    for key in data["tracks"]:
+        car_states = data["tracks"][key]["state"] # x: 0, y:1, heading:6 of certain traffic
+        xs, ys, headings = car_states[:,0],car_states[:,1], car_states[:,6]
+        for a in [xs, ys, headings]:
+            a[a==0] = np.nan # to replace the zeros in the traffic data
+        plot_car(ax, xs, ys, headings, label = "traffic")
 
+    plt.savefig("/home/xinyi/src/decision-transformer/gym/figs/map_visualization/map+car.png")

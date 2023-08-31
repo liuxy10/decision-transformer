@@ -152,6 +152,8 @@ def evaluate_episode_rtg(
 
     return episode_return, episode_length, info['arrive_dest']
 
+
+
 def evaluate_episode_rtg_waymo(
         env,
         state_dim,
@@ -167,6 +169,16 @@ def evaluate_episode_rtg_waymo(
         mode='normal',
         save_fig_dir = "",
     ):
+
+    """evaluate_episode_rtg_waymo
+    evaluate episodes using DT on waymo data env
+    
+    Returns:
+        episode_return: predicted return of current episode(scene)
+        episode_length: predicted length of current episode(scene)
+        is_success: is the current trail successful or not
+        seed: the seed of current episode(scene)
+    """
 
     model.eval()
     model.to(device=device)
@@ -258,13 +270,14 @@ def evaluate_episode_rtg_waymo(
             actual_speed[t+1:] = None
             action_pred[t+1:] = None
             actual_rew[t+1:] = None
+
             actual_pos[t+1:,:] = None
 
             break
 
     plot_comparison = True
     action_pred = np.array(action_pred)
-    if plot_comparison:
+    if save_fig_dir != "":
         plot_states_compare(ts, 
                    action_pred, acc_rec, 
                    actual_speed, speed_rec, 
@@ -275,5 +288,5 @@ def evaluate_episode_rtg_waymo(
                    seed, 
                    succeed = info['arrive_dest'])
 
-    return episode_return, episode_length, info['arrive_dest']
+    return episode_return, episode_length, info['arrive_dest'],seed
 

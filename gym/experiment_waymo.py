@@ -24,7 +24,7 @@ from decision_transformer.training.seq_trainer import SequenceTrainer
 from metadrive.policy.replay_policy import ReplayEgoCarPolicy, PMKinematicsEgoPolicy
 from metadrive.policy.env_input_policy import EnvInputHeadingAccPolicy
 WAYMO_SAMPLING_FREQ = 10
-acc_scale = 5
+acc_scale = 1
 
 import pickle
 
@@ -47,7 +47,7 @@ def experiment(
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
 
-    env_name, dataset = variant['env'], 'waymo_AC_5'#variant['dataset']
+    env_name, dataset = variant['env'], 'waymo_tanh_false'#variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
@@ -60,7 +60,7 @@ def experiment(
         "no_traffic": False,
         "agent_policy": PMKinematicsEgoPolicy,
         "waymo_data_directory":variant['pkl_dir'],
-        "case_num": 100,
+        "case_num": 10000,
         "start_seed": 0,
         "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
         "use_render": False,
@@ -74,11 +74,12 @@ def experiment(
     }
     )
     print("building test set")
-    test_env = AddCostToRewardEnv(env.config)
-    test_env.config.update({
+    test_config = env.config.copy()
+    test_config.update({
         "case_num": 1000,
         "start_seed":10000,
     })
+    test_env = AddCostToRewardEnv(test_config)
 
     max_ep_len = 90
     env_targets = [400,600] # evaluation conditioning targets
@@ -270,7 +271,7 @@ def experiment(
                             model,
                             max_ep_len=max_ep_len,
                             rew_scale=scale,
-                            acc_scale= 5,
+                            acc_scale= acc_scale,
                             target_return=target_rew/scale,
                             mode=mode,
                             state_mean=state_mean,
@@ -309,6 +310,7 @@ def experiment(
             act_dim=act_dim,
             max_length=K,
             max_ep_len=max_ep_len,
+            action_tanh=False,
             hidden_size=variant['embed_dim'], # default 128
             n_layer=variant['n_layer'],
             n_head=variant['n_head'],
@@ -408,9 +410,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_eval_episodes', type=int, default=50)
     # parser.add_argument('--num_eval_episodes', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=200)
-    parser.add_argument('--num_steps_per_iter', type=int, default=500) # 5000
+    parser.add_argument('--num_steps_per_iter', type=int, default=5000) # 5000
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
+    parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
     # parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()

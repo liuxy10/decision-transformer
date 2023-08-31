@@ -28,7 +28,7 @@ import pickle
 
 def eval(model, model_type,
        num_eval_episodes, test_env,  state_dim, act_dim, 
-       max_ep_len, rew_scale, acc_scale, target_rew, mode, state_mean, state_std, device):
+       max_ep_len, rew_scale, acc_scale, target_rew, mode, state_mean, state_std, device, save_fig_dir):
     successes, returns, lengths, success_seeds = [], [], [], []
     for _ in range(num_eval_episodes):
         with torch.no_grad():
@@ -46,7 +46,7 @@ def eval(model, model_type,
                     state_mean=state_mean,
                     state_std=state_std,
                     device=device,
-                    save_fig_dir= "/home/xinyi/src/decision-transformer/gym/figs/guide_only_dt_training"
+                    save_fig_dir= save_fig_dir
                 )
                 if is_success:
                     success_seeds.append(seed)
@@ -79,7 +79,8 @@ def eval(model, model_type,
 if __name__== "__main__":
 
     # import model
-    expert_model_dir = '/home/xinyi/src/decision-transformer/gym/wandb/run-20230823_230743-3s6y7mzy'
+    expert_model_dir = '/home/xinyi/src/decision-transformer/wandb/run-20230825_223522-23a3lhoj'
+    # expert_model_dir ='/home/xinyi/src/decision-transformer/gym/wandb/run-20230823_230743-3s6y7mzy'
     num_scenarios = 100
     loaded_stats = js_utils.load_demo_stats(
             path=expert_model_dir
@@ -99,7 +100,7 @@ if __name__== "__main__":
             "case_num": num_scenarios,
             "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
             "use_render": False,
-            'start_seed': 0,
+            'start_seed': 10000,
             "horizon": 90/5,
             "reactive_traffic": False,
                     "vehicle_config": dict(
@@ -112,8 +113,19 @@ if __name__== "__main__":
 
     print(
         eval(model, 'dt',
-       num_eval_episodes=100, test_env=test_env,  state_dim=145, act_dim=2, 
-       max_ep_len=90, rew_scale=100, acc_scale=5., target_rew=400, mode='normal', state_mean=obs_mean, state_std=obs_std, device='cpu')
+       num_eval_episodes=100, 
+       test_env=test_env,  
+       state_dim=145, 
+       act_dim=2, 
+       max_ep_len=90, 
+       rew_scale=100, 
+       acc_scale=5., 
+       target_rew=400, 
+       mode='normal', 
+       state_mean=obs_mean, 
+       state_std=obs_std, 
+       device='cpu', 
+       save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/guide_only_dt_training")
     )
     
 
