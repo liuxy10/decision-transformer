@@ -79,8 +79,10 @@ def eval(model, model_type,
 if __name__== "__main__":
 
     # import model
-    expert_model_dir = '/home/xinyi/src/decision-transformer/wandb/run-20230825_223522-23a3lhoj'
-    # expert_model_dir ='/home/xinyi/src/decision-transformer/gym/wandb/run-20230823_230743-3s6y7mzy'
+    # expert_model_dir = '/home/xinyi/src/decision-transformer/wandb/run-20230825_223522-23a3lhoj'
+    # expert_model_dir ='/home/xinyi/src/decision-transformer/gym/wandb/run-20230823_230743-3s6y7mzy' #  [-1,1] bound
+    expert_model_dir = '/home/xinyi/src/decision-transformer/gym/wandb/run-20230831_051809-148t1k4v' # 4-head, unbounded
+    
     num_scenarios = 100
     loaded_stats = js_utils.load_demo_stats(
             path=expert_model_dir
@@ -119,13 +121,13 @@ if __name__== "__main__":
        act_dim=2, 
        max_ep_len=90, 
        rew_scale=100, 
-       acc_scale=5., 
+       acc_scale=1., 
        target_rew=400, 
        mode='normal', 
        state_mean=obs_mean, 
        state_std=obs_std, 
        device='cpu', 
-       save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/guide_only_dt_training")
+       save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/guide_only_dt_training/4-head-unbounded-148t1k4v/")
     )
     
 

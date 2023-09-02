@@ -47,7 +47,7 @@ def experiment(
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
 
-    env_name, dataset = variant['env'], 'waymo_tanh_false'#variant['dataset']
+    env_name, dataset = variant['env'], variant['param_set_name']#variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
@@ -76,9 +76,10 @@ def experiment(
     print("building test set")
     test_config = env.config.copy()
     test_config.update({
-        "case_num": 1000,
+        "case_num": 100,
         "start_seed":10000,
     })
+    
     test_env = AddCostToRewardEnv(test_config)
 
     max_ep_len = 90
@@ -264,7 +265,7 @@ def experiment(
                 with torch.no_grad():
                     if model_type == 'dt':
                         # ret, length, is_success = evaluate_episode_rtg(
-                        ret, length, is_success =  evaluate_episode_rtg_waymo(
+                        ret, length, is_success, seed =  evaluate_episode_rtg_waymo(
                             test_env,
                             state_dim,
                             act_dim,
@@ -277,7 +278,8 @@ def experiment(
                             state_mean=state_mean,
                             state_std=state_std,
                             device=device,
-                            save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/training"
+                            # save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/training"
+                            # save_fig_dir=""
                             )
                     else:
                         ret, length, is_success = evaluate_episode(
@@ -306,7 +308,7 @@ def experiment(
 
     if model_type == 'dt':
         model = DecisionTransformer(
-            state_dim=state_dim, # state dimension should be 
+            state_dim=state_dim, 
             act_dim=act_dim,
             max_length=K,
             max_ep_len=max_ep_len,
@@ -394,20 +396,20 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='9')  # normal for standard setting, delayed for sparse
     parser.add_argument('--pkl_dir', type=str, default='/home/xinyi/src/data/metadrive/pkl_9/')
 
-
+    parser.add_argument('--param_set_name', type=str, default='dropout-.25')
     parser.add_argument('--K', type=int, default=20)
     parser.add_argument('--pct_traj', type=float, default=1.) 
     parser.add_argument('--batch_size', type=int, default=512) # increase to stablize, as well as dataset 
     parser.add_argument('--model_type', type=str, default='dt')  # dt for decision transformer, bc for behavior cloning
     parser.add_argument('--embed_dim', type=int, default=128) 
     parser.add_argument('--n_layer', type=int, default=3)
-    parser.add_argument('--n_head', type=int, default=1)
+    parser.add_argument('--n_head', type=int, default=4) # could be devided by 128
     parser.add_argument('--activation_function', type=str, default='relu')
-    parser.add_argument('--dropout', type=float, default=0.1)
+    parser.add_argument('--dropout', type=float, default=0.2) #0.1
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4) 
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
-    parser.add_argument('--warmup_steps', type=int, default=1000) #10000
-    parser.add_argument('--num_eval_episodes', type=int, default=50)
+    parser.add_argument('--warmup_steps', type=int, default=10000) #10000
+    parser.add_argument('--num_eval_episodes', type=int, default=20)
     # parser.add_argument('--num_eval_episodes', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=200)
     parser.add_argument('--num_steps_per_iter', type=int, default=5000) # 5000
