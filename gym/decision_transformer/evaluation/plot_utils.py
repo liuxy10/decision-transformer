@@ -16,12 +16,12 @@ def plot_states_compare(ts,
                    pos_rec, actual_pos, 
                    actual_heading, heading_rec, 
                    actual_rew,
-                   save_fig_dir, seed, succeed):
+                   save_fig_dir, seed, succeed, md_name = 'DT'):
     actual_pos = np.array(actual_pos)
     fig_states, axs = plt.subplots(2, 2, figsize = (12,8))
     fig_bv, ax = plt.subplots(1,1, figsize = (8,8)) #, gridspec_kw={'width_ratios': [1, 1], 'height_ratios': [1, 1]} )
-    md_name = 'DT'
-    colors = {'waymo': 'blue', 'DT': 'red'}
+    
+    colors = {'waymo': 'blue', 'DT': 'red', 'BC': 'red'}
     axs[0,0].plot(ts, acc_rec, color = colors['waymo'],  label = 'waymo acc' )
     axs[0,0].plot(ts, action_pred[:,1], color = colors[md_name], label = md_name +' pred acc')
     axs[1,0].plot(ts, actual_heading, color = colors[md_name],label = md_name +' actual heading' )
@@ -33,8 +33,9 @@ def plot_states_compare(ts,
     # axs[1,1].plot(ts, rew_rec, label = 'waymo reward')
     
     ax.set_aspect('equal')
+    
     plot_car(ax, actual_pos[:,0], actual_pos[:,1], actual_heading, label = md_name)
-    plot_car(ax, pos_rec[:,0], pos_rec[:,1], heading_rec, label = "waymo")
+    
     plot_dest_range(ax, pos_rec[-1,:], 5)
 
     
@@ -79,7 +80,7 @@ def plot_dest_range(ax, center, radius):
 def plot_car(ax, xs, ys, headings, label):
     
     
-    if label == 'DT':
+    if label in ['DT', 'BC']:
         car_icon_path = '/home/xinyi/src/decision-transformer/gym/car_red.png'
         ax.plot(xs, ys, label = label, color = "red")
     elif label == 'waymo':
