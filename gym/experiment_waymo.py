@@ -60,7 +60,7 @@ def experiment(
         "no_traffic": False,
         "agent_policy": PMKinematicsEgoPolicy,
         "waymo_data_directory":variant['pkl_dir'],
-        "case_num": 10000,
+        "case_num": 50000,
         "start_seed": 0,
         "physics_world_step_size": 1/WAYMO_SAMPLING_FREQ, # have to be specified each time we use waymo environment for training purpose
         "use_render": False,
@@ -75,15 +75,18 @@ def experiment(
     )
     print("building test set")
     test_config = env.config.copy()
-    test_config.update({
-        "case_num": 100,
-        "start_seed":10000,
-    })
     
+    set_separate_validation_set = True
+    if set_separate_validation_set: 
+        test_config.update({
+            "case_num": 100,
+            "start_seed":0,
+        })
+
     test_env = AddCostToRewardEnv(test_config)
 
     max_ep_len = 90
-    env_targets = [400,600] # evaluation conditioning targets
+    env_targets = [400,1000] # evaluation conditioning targets
     scale = 100.  # normalization for rewards/returns
 
     state_dim = env.observation_space.shape[0]
@@ -222,9 +225,9 @@ def experiment(
             # get sequences from dataset
             s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
 
-            # xinyi: normalize acc from -5,5 to -1,1
+            # xinyi: normalize acc from -5,5 to -1,1 # not any more
             ac = traj['actions'][si:si + max_len].reshape(1, -1, act_dim)
-            ac[0, :, 1] /= acc_scale 
+            # ac[0, :, 1] /= acc_scale 
             a.append(ac)
             r.append(traj['rewards'][si:si + max_len].reshape(1, -1, 1))
             if 'terminals' in traj:
@@ -248,8 +251,8 @@ def experiment(
             timesteps[-1] = np.concatenate([np.zeros((1, max_len - tlen)), timesteps[-1]], axis=1)
             mask.append(np.concatenate([np.zeros((1, max_len - tlen)), np.ones((1, tlen))], axis=1))
 
-        s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device)
-        a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device)
+        s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device) # batchsize * K * obs_dim
+        a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device) # batchsize * K * act_dim
         r = torch.from_numpy(np.concatenate(r, axis=0)).to(dtype=torch.float32, device=device)
         d = torch.from_numpy(np.concatenate(d, axis=0)).to(dtype=torch.long, device=device)
         rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
@@ -257,6 +260,11 @@ def experiment(
         mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
 
         return s, a, r, d, rtg, timesteps, mask
+    
+    fig_dir = "/home/xinyi/src/decision-transformer/gym/figs/training"
+    fig_subdir = os.path.join(fig_dir, variant['param_set_name'])
+    if not os.path.isdir(fig_subdir):
+        os.makedirs(fig_subdir)
 
     def eval_episodes(target_rew):
         def fn(model):
@@ -278,7 +286,7 @@ def experiment(
                             state_mean=state_mean,
                             state_std=state_std,
                             device=device,
-                            # save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/training"
+                            save_fig_dir= fig_subdir
                             # save_fig_dir=""
                             )
                     else:
@@ -391,28 +399,37 @@ def experiment(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='waymo')
-    parser.add_argument('--dataset_dir', type=str, default='/home/xinyi/src/data/metadrive/dt_pkl/waymo_n_10000_lam_1_eps_10')  
-    parser.add_argument('--mode', type=str, default='9')  # normal for standard setting, delayed for sparse
-    parser.add_argument('--pkl_dir', type=str, default='/home/xinyi/src/data/metadrive/pkl_9/')
 
-    parser.add_argument('--param_set_name', type=str, default='dropout-.25')
-    parser.add_argument('--K', type=int, default=20)
-    parser.add_argument('--pct_traj', type=float, default=1.) 
+    #### interested params ######
+    
+    parser.add_argument('--param_set_name', type=str, default='default')
+    parser.add_argument('--K', type=int, default= 20) # K =20 decides the dependent time window
     parser.add_argument('--batch_size', type=int, default=512) # increase to stablize, as well as dataset 
+    parser.add_argument('--n_head', type=int, default=1) # could be devided by 128
+    parser.add_argument('--warmup_steps', type=int, default=10000) #10000
+    parser.add_argument('--activation_function', type=str, default='relu')
+    parser.add_argument('--dropout', type=float, default=0.25) #0.1
+    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4) 
+    parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
+    
+    ###############################
+
+    ######### Test condition ######
+    
+    parser.add_argument('--num_eval_episodes', type=int, default=20)
+    parser.add_argument('--max_iters', type=int, default=5000)
+    parser.add_argument('--num_steps_per_iter', type=int, default=2000) # 5000
+    
+    ###############################
+    parser.add_argument('--env', type=str, default='waymo')
+    parser.add_argument('--dataset_dir', type=str, default='/home/xinyi/src/data/metadrive/dt_pkl/waymo_n_50000_lam_1_eps_10')  
+    parser.add_argument('--mode', type=str, default='normal')  # normal for standard setting, delayed for sparse
+    parser.add_argument('--pkl_dir', type=str, default='/home/xinyi/src/data/metadrive/pkl_9/')
+    
+    parser.add_argument('--pct_traj', type=float, default=1.) 
     parser.add_argument('--model_type', type=str, default='dt')  # dt for decision transformer, bc for behavior cloning
     parser.add_argument('--embed_dim', type=int, default=128) 
     parser.add_argument('--n_layer', type=int, default=3)
-    parser.add_argument('--n_head', type=int, default=4) # could be devided by 128
-    parser.add_argument('--activation_function', type=str, default='relu')
-    parser.add_argument('--dropout', type=float, default=0.2) #0.1
-    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4) 
-    parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
-    parser.add_argument('--warmup_steps', type=int, default=10000) #10000
-    parser.add_argument('--num_eval_episodes', type=int, default=20)
-    # parser.add_argument('--num_eval_episodes', type=int, default=10)
-    parser.add_argument('--max_iters', type=int, default=200)
-    parser.add_argument('--num_steps_per_iter', type=int, default=5000) # 5000
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
     # parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)

@@ -82,7 +82,7 @@ if __name__== "__main__":
     # expert_model_dir = '/home/xinyi/src/decision-transformer/wandb/run-20230825_223522-23a3lhoj'
     # expert_model_dir ='/home/xinyi/src/decision-transformer/gym/wandb/run-20230823_230743-3s6y7mzy' #  [-1,1] bound
     expert_model_dir = '/home/xinyi/src/decision-transformer/gym/wandb/run-20230831_051809-148t1k4v' # 4-head, unbounded
-    
+
     num_scenarios = 100
     loaded_stats = js_utils.load_demo_stats(
             path=expert_model_dir
@@ -115,7 +115,7 @@ if __name__== "__main__":
 
     print(
         eval(model, 'dt',
-       num_eval_episodes=100, 
+       num_eval_episodes=10, 
        test_env=test_env,  
        state_dim=145, 
        act_dim=2, 

@@ -275,7 +275,6 @@ def evaluate_episode_rtg_waymo(
 
             break
 
-    plot_comparison = True
     action_pred = np.array(action_pred)
     if save_fig_dir != "":
         plot_states_compare(ts, 
