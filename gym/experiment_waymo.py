@@ -402,7 +402,7 @@ if __name__ == '__main__':
 
     #### interested params ######
     
-    parser.add_argument('--param_set_name', type=str, default='default')
+    parser.add_argument('--param_set_name', type=str, default='default-50000')
     parser.add_argument('--K', type=int, default= 20) # K =20 decides the dependent time window
     parser.add_argument('--batch_size', type=int, default=512) # increase to stablize, as well as dataset 
     parser.add_argument('--n_head', type=int, default=1) # could be devided by 128

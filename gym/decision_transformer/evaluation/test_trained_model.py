@@ -78,10 +78,20 @@ def eval(model, model_type,
 
 if __name__== "__main__":
 
+    parser = argparse.ArgumentParser()
+
+
+    
     # import model
     # expert_model_dir = '/home/xinyi/src/decision-transformer/wandb/run-20230825_223522-23a3lhoj'
     # expert_model_dir ='/home/xinyi/src/decision-transformer/gym/wandb/run-20230823_230743-3s6y7mzy' #  [-1,1] bound
-    expert_model_dir = '/home/xinyi/src/decision-transformer/gym/wandb/run-20230831_051809-148t1k4v' # 4-head, unbounded
+    # expert_model_dir = '/home/xinyi/src/decision-transformer/gym/wandb/run-20230831_051809-148t1k4v' # 4-head, unbounded
+    
+    # first you browse wandb, copy the name include the 6-digit code or 8-char code
+
+
+    exp_fn = 'run-20230901_024022-3hhgyjq0'
+    expert_model_dir = os.path.join('/home/xinyi/src/decision-transformer/gym/wandb/', exp_fn) # default num_scenario 10000
 
     num_scenarios = 100
     loaded_stats = js_utils.load_demo_stats(
@@ -115,7 +125,7 @@ if __name__== "__main__":
 
     print(
         eval(model, 'dt',
-       num_eval_episodes=10, 
+       num_eval_episodes=20, 
        test_env=test_env,  
        state_dim=145, 
        act_dim=2, 
@@ -127,7 +137,7 @@ if __name__== "__main__":
        state_mean=obs_mean, 
        state_std=obs_std, 
        device='cpu', 
-       save_fig_dir="/home/xinyi/src/decision-transformer/gym/figs/guide_only_dt_training/4-head-unbounded-148t1k4v/")
+       save_fig_dir=os.path.join("/home/xinyi/src/decision-transformer/gym/figs/", exp_fn))
     )
     
 
